@@ -1,0 +1,42 @@
+# Stage 1 : Build Python Dependencies
+FROM python:3.11-slim-buster as BUILDER
+
+# create a working directory
+WORKDIR /data
+
+# Copy only Python dependencies from code
+COPY requirements.txt requirements.txt
+COPY app.py app.py
+COPY .flaskenv .flaskenv
+
+# Install the Python dependencies
+RUN python3 -m venv /opt/venv && \
+  pip wheel --no-cache-dir --no-deps --wheel-dir /data/wheels -r requirements.txt
+
+# Copy over code
+COPY /movie_library ./movie_library
+COPY entrypoint.sh ./entrypoint.sh
+
+
+FROM python:3.11-slim AS RUNNER
+
+# create a working directory
+WORKDIR /app
+
+# Copy relevent application dependencies
+COPY --from=BUILDER /data/movie_library ./movie_library
+COPY --from=BUILDER /data/wheels ./wheels
+COPY --from=BUILDER /data/requirements.txt ./requirements.txt
+COPY --from=BUILDER /data/app.py ./app.py
+COPY --from=BUILDER /data/.flaskenv ./.flaskenv
+COPY --from=BUILDER /data/entrypoint.sh ./entrypoint.sh
+
+# Install wheel dependencies
+RUN pip install --no-cache ./wheels/* && \
+  chmod +x entrypoint.sh
+
+# Exposed Port
+EXPOSE 5000
+
+# Run entrypoint script
+ENTRYPOINT [ "./entrypoint.sh" ]

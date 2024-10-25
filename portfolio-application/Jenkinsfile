@@ -1,0 +1,153 @@
+pipeline {
+
+  agent any
+
+  environment {
+    APP_IMAGE = "ernestklu"
+    NGINX_IMAGE = "ernestklu:nginx"
+    APP_URL = "http://taskmaster.chickenkiller.com:3000/signup"
+  }
+  triggers {
+    gitlab(triggerOnPush: true, triggerOnMergeRequest: true, branchFilterType: 'All')
+  }
+  options {
+    gitlabConnection('Jenkins-gitlab-Auth')
+	  timestamps()
+  }
+
+  stages {
+
+    stage("Checkout") {
+      steps {
+        checkout scm
+        sh "git fetch --tags"
+        script {
+          def checkCommit = sh(script: 'git log -1 | grep "#test"', returnStatus: true)
+          env.GIT_COMMIT_MESSAGE = (checkCommit == 0 ? 'true' : 'false')
+        }
+      }
+    }
+
+    stage("Tag") {
+      steps {
+        script {
+          def check_tag = sh(script: 'git tag --sort=-version:refname --merged=$(git rev-parse --abbrev-ref HEAD) | head -1', returnStdout: true).trim()
+          def major, minor, patch
+          if (check_tag) {
+            // If there are tags in the repo, use the latest tag and increment the patch version
+            def (currentMajor, currentMinor, currentPatch) = check_tag.tokenize('.')
+            patch = currentPatch.toInteger() + 1
+            major = currentMajor
+            minor = currentMinor
+          } else {
+            // If there are no tags in the repo, use the version from version.txt as the starting tag
+            def versionFile = readFile('version.txt').trim()
+            (major, minor, patch) = versionFile.tokenize('.')
+            patch = patch.toInteger()
+          }
+          env.TAG = "$major.$minor.$patch"
+        }
+      }
+    }
+
+    stage("Build") {
+      steps {
+        dir('app') {
+          sh 'docker buildx build -f Dockerfile -t ${APP_IMAGE}:${TAG} .'
+          sh 'docker buildx build -f Dockerfile.nginx -t ${NGINX_IMAGE}.${TAG} .'
+        }
+      }
+    }
+
+    stage("E2E Testing") {
+      when {
+        expression { env.GIT_COMMIT_MESSAGE == 'true' }
+      }
+      steps {
+        dir('app') {
+          withCredentials([file(credentialsId: 'FLASK_ENV', variable: 'ENV_FILE')]) {
+            sh 'cp $ENV_FILE .env'
+            sh "docker compose -f compose.yaml up -d"
+            script {
+              def e2eExitCode=sh(script: "chmod +x ../e2e.sh && bash ../e2e.sh ${APP_URL}", returnStatus: true)
+              if (e2eExitCode == 0) {
+                echo "E2E test successful"
+              } else {
+                echo "E2E test failed"
+                currentBuild.result = 'FAILURE'
+              }
+              sh "docker compose -f compose.yaml down -v"
+            }
+          }
+        }
+      }
+    }
+
+    stage("Publish - Artifact Registry") {
+      when {
+        expression { BRANCH_NAME == 'main' }
+      }
+      steps {
+        withCredentials([file(credentialsId: 'GOOGLE_ARTIFACT_REGISTRY_KEY', variable: 'GAR_CREDS')]) {
+          sh 'cat "${GAR_CREDS}" | docker login -u _json_key_base64 --password-stdin https://europe-west1-docker.pkg.dev'
+          sh "docker tag ${APP_IMAGE}:${TAG} europe-west1-docker.pkg.dev/taskmaster-rgt/watchlist/watchlist:${TAG}"
+          sh "docker tag ${NGINX_IMAGE}.${TAG} europe-west1-docker.pkg.dev/taskmaster-rgt/watchlist/watchlist:nginx.${TAG}"
+          sh "docker push europe-west1-docker.pkg.dev/taskmaster-rgt/watchlist/watchlist:${TAG}"
+          sh "docker push europe-west1-docker.pkg.dev/taskmaster-rgt/watchlist/watchlist:nginx.${TAG}"
+        }
+      }
+    }
+
+    stage("Publish Tags") {
+      when {
+        expression { BRANCH_NAME == 'main' }
+      }
+      steps {
+        sshagent(['JENKINS_gitlab_SSH_KEY']) {
+          sh "git clean -f"
+          sh "git tag -a ${TAG} -m 'release version ${TAG}'"
+          sh "git push origin ${TAG}"
+        }
+      }
+    }
+
+    stage("Package and Deploy") {
+      when {
+        expression { BRANCH_NAME == 'main' }
+      }
+      steps {
+        script {
+          sshagent(['JENKINS_gitlab_SSH_KEY']) {
+            git branch: 'main', url: 'git@gitlab.com:TaskMasterErnest/portfolio-gitops-config.git'
+            dir ('app') {
+              // get the Chart version
+              chartVersion = sh(script: "awk '/^version:/ { print \$2 }' Chart.yaml", returnStdout: true).trim()
+              // set the Git user identity
+              sh "git config --global user.email 'jenkins@gitlab.com'"
+              sh "git config --global user.name 'jenkins'"
+              // package the chart appVersion with the tag
+              sh 'sudo helm package . --app-version "${TAG}"'
+              withCredentials([file(credentialsId: 'GOOGLE_ARTIFACT_REGISTRY_KEY', variable: 'GAR_CREDS')]) {
+                sh 'cat "${GAR_CREDS}" | sudo helm registry login -u _json_key_base64 --password-stdin https://europe-west1-docker.pkg.dev'
+                sh 'sudo helm push *.tgz oci://europe-west1-docker.pkg.dev/taskmaster-rgt/watchlist/charts'
+                sh "rm -rf *.tgz"
+              }
+              // commit changes
+              sh "git commit -am 'Updated appVersion to ${TAG}, pushed chart version ${chartVersion} to Artifact Registry'"
+              sh "git push --set-upstream origin main"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh "docker image prune -f"
+      updategitlabCommitStatus name: 'pipeline', state: currentBuild.result == 'SUCCESS' ? 'success' : 'failed'
+      cleanWs()
+    }
+  }
+
+}

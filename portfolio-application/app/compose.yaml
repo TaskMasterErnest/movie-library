@@ -1,0 +1,60 @@
+version: "3"
+services:
+  mongodb:
+    image: bitnami/mongodb:7.0.5
+    container_name: mongodb
+    ports:
+      - "27017"
+    env_file:
+      - .env
+    volumes:
+      - mongodb-data:/bitnami/mongodb
+      - ./create-dbuser.sh:/docker-entrypoint-initdb.d/create-dbuser.sh
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    networks:
+      - mongodb-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # image: ${APP_IMAGE}:${TAG}
+    container_name: watchlist
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - proxy-net
+      - mongodb-net
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    # image: ${NGINX_IMAGE}.${TAG}
+    container_name: nginx
+    restart: unless-stopped
+    networks:
+      - proxy-net
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  mongodb-data:
+
+networks:
+  mongodb-net:
+  proxy-net:
+

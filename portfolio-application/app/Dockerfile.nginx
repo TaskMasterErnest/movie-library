@@ -1,0 +1,7 @@
+FROM nginx:alpine
+
+# Copy over static and template files
+COPY movie_library/static /usr/share/nginx/html/static
+COPY movie_library/templates /etc/nginx/templates
+# Copy Nginx configuration file
+COPY nginx.conf /etc/nginx/nginx.conf

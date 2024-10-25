@@ -1,0 +1,3 @@
+FLASK_APP=movie_library
+FLASK_ENV=production
+FLASK_DEBUG=1
