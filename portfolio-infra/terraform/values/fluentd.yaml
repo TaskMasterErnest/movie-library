@@ -1,0 +1,27 @@
+# helm install fluentd bitnami/fluentd
+#   --set aggregator.configMap=elasticsearch-output
+#   --set forwarder.configMap=apache-log-parser
+#   --set aggregator.extraEnvVars[0].name=ELASTICSEARCH_HOST
+#   --set aggregator.extraEnvVars [0].value=ELASTICSEARCH-COORDINATING-NODE-NAME
+#   --set aggregator.extraEnvVars [1].name=ELASTICSEARCH_PORT
+#   --set-string aggregator.extraEnvVars [1].value=9200
+#elasticsearch-coordinating-hl.logging.svc.cluster.local
+
+aggregator:
+  enabled: true
+  configMap: elasticsearch-output
+  extraEnvVars:
+    - name: ELASTICSEARCH_HOST
+      value: "elasticsearch.logging.svc.cluster.local" 
+    - name: ELASTICSEARCH_PORT
+      value: "9200"
+
+
+forwarder:
+  configMap: apache-log-parser
+
+
+persistence:
+  enabled: true
+  storageClass: "standard"
+  size: 1Gi

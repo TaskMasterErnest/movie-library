@@ -1,0 +1,49 @@
+configs:
+  params:
+    server.insecure: true
+  secret:
+    argocdServerAdminPassword: "$2a$10$ovhHWmCMxuR4TYc0/mB9AOq6T1uFcUNvyD2XV0Fxjtkt7G6bxKGCi"
+# password is ernst1234@passargo
+
+
+crds:
+  install: true
+  keep: true
+
+
+server:
+  ingress:
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    ingressClassName: "nginx"
+    hosts:
+      - argocd.tskmstr.mooo.com
+    paths:
+      - /
+    pathType: Prefix
+
+
+# # Enable this when Prometheus is enabled
+# metrics:
+#   enabled: true
+#   applicationLabels:
+#     enabled: false
+#     labels: []
+#   service:
+#     type: ClusterIP
+#     clusterIP: ""
+#     annotations: {}
+#     labels: {}
+#     servicePort: 8082
+#     portName: http-metrics
+#   serviceMonitor:
+#     enabled: true
+#     interval: 30s
+
+
+global:
+  logging:
+    format: json
+    level: warn

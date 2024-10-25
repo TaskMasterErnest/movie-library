@@ -1,0 +1,82 @@
+namespaceOverride: "monitoring"
+
+
+alertmanager:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    # labels:
+    hosts:
+      - alertmanager.tskmstr.mooo.com
+    paths:
+      - /
+  
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: "standard"
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+
+grafana:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    # labels:
+    hosts:
+      - grafana.tskmstr.mooo.com
+    path: /
+
+  
+  persistence:
+    enabled: true
+    type: sts
+    storageClassName: "standard"
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    hosts:
+      - prometheus.tskmstr.mooo.com
+    paths:
+      - /
+  prometheusSpec:
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    additionalScrapeConfigs:
+      - job_name: cert-manager
+        honor_timestamps: true
+        scrape_interval: 1m
+        scrape_timeout: 1m
+        metrics_path: /metrics
+        scheme: http
+        static_configs:
+          - targets:
+              - certmanager-cert-manager.certmanager-cert-manager.svc.cluster.local:9402  
+      - job_name: ingress_controller
+        honor_timestamps: true
+        scrape_interval: 1m
+        scrape_timeout: 1m
+        metrics_path: /metrics
+        scheme: http
+        static_configs:
+          - targets:
+              - ingress-nginx-controller-metrics.ingress-nginx.svc.cluster.local:10254

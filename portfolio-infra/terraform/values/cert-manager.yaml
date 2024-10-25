@@ -1,0 +1,15 @@
+installCRDs: true
+
+replicaCount: 2
+
+# turn metrics on when Prometheus is deployed
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: true
+    prometheusInstance: default
+    targetPort: 9402
+    path: /metrics
+    interval: 60s
+    scrapeTimeout: 30s
+    honorLabels: true
