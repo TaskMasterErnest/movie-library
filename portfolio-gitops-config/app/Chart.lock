@@ -1,0 +1,6 @@
+dependencies:
+- name: mongodb
+  repository: https://raw.gitlabusercontent.com/bitnami/charts/archive-full-index/bitnami
+  version: 14.8.3
+digest: sha256:bd685d2ffafa62cccfce21f55163a36a6eb303febd8665467f364133ed69ccd8
+generated: "2024-02-12T07:41:54.206904894Z"

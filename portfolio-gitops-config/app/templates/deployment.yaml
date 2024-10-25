@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: {{ default "default" .Values.namespace }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        prometheus.io/scrape: {{ .Values.annotations.scrape | quote }}
+      annotations:
+        prometheus.io/scrape: {{ .Values.annotations.scrape | quote }}
+        prometheus.io/port: {{ .Values.annotations.port | quote }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.registry.key }}
+      initContainers:        
+        - name: wait-for-mongodb
+          image: busybox
+          imagePullPolicy: {{ .Values.image.imagePullPolicy | quote }}
+          command: ["sh", "-c", "sleep 30"]
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.repository.repo }}/{{ .Chart.Name }}:{{ .Chart.AppVersion }}" # Chart.Name is a placeholder for imageName from GCR.
+          imagePullPolicy: {{ .Values.image.imagePullPolicy | quote }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ .Chart.Name }}-config
+            - secretRef:
+                name: db-secret
+          # env:
+          #   - name: MONGODB_URI
+          #     value: mongodb://root:$(MONGODB_ROOT_PASSWORD)@$(MONGODB_SVC).$(MONGODB_NAMESPACE).svc.cluster.local:27017/movie?authSource=admin&replicaSet=rs0&ssl=false
+
+        - name: {{ .Chart.Name }}-nginx
+          image: "{{ .Values.repository.repo }}/{{ .Chart.Name }}:nginx.{{ .Chart.AppVersion }}" # Chart.Name is a placeholder for imageName from GCR.
+          imagePullPolicy: {{ .Values.image.imagePullPolicy | quote }}
+          ports:
+            - containerPort: {{ .Values.proxy.service.targetPort }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ .Chart.Name }}-nginx-config
+            defaultMode: 0644

@@ -1,0 +1,120 @@
+# Default values for app.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# FLASK APPLICATION VALUES
+appName: watchlist
+
+namespace: ""
+
+replicaCount: 2
+
+repository:
+  repo: europe-west1-docker.pkg.dev/taskmaster-rgt/watchlist
+
+image:
+  name: # name from Google Container Registry
+  tag: # tag from image in Google Container Registry
+  imagePullPolicy: "IfNotPresent"
+
+# the nginx proxy service to be used
+proxy:
+  service:
+    name: http
+    port: 80
+    targetPort: 80
+
+# the docker registry key for auth to Artifact Registry
+registry:
+  key: artifact-registry-key
+
+service:
+  # name: watchlist-svc # depends on appName, change accordingly
+  port: 5000
+  targetPort: 5000
+
+secret:
+  type: Opaque
+
+cronjob:
+  enabled: true
+  schedule: "@midnight"
+
+tls:
+  enabled: true # ingress must be enabled for this to work.
+
+issuer:
+  email: "kluernest08@gmail.com"
+  server: https://acme-v02.api.letsencrypt.org/directory
+  privateKeyName: letsencrypt-nginx-private-key
+
+# Use the Ingress object provisioned to allow traffic into/out of the application Pods
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: taskmaster.gotdns.ch
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+   - secretName: letsencrypt-nginx
+     hosts:
+       - taskmaster.gotdns.ch
+
+# Enable a storageClass to use
+# Also can be used when persistence is enabled for a dependency
+storageClass:
+  enabled: true
+  name: crm-disk
+  provisioner: kubernetes.io/gce-pd
+  volumeBindingMode: WaitForFirstConsumer
+  reclaimPolicy: Delete
+  allowVolumeExpansion: true
+  type: pd-standard
+
+
+# PROMETHEUS METRICS SCRAPE
+annotations:
+  scrape: true
+  port: http
+
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelector:
+      matchLabels:
+        app: watchlist
+        prometheus.io/scrape: "true"
+
+
+# MONGODB VALUES
+mongodb:
+  enabled: true
+
+  fullnameOverride: watchlist-mongo
+
+  architecture: replicaset
+
+  arbiter:
+    enabled: false
+
+  service:
+    nameOverride: mongo-svc
+
+  auth:
+    existingSecret: mongodb-secret
+
+  replicaSetName: rs0
+
+  terminationGracePeriodSeconds: 10
+
+  replicaCount: 3
+
+  persistence:
+    enabled: true
+    storageClass: standard
+    size: 5Gi

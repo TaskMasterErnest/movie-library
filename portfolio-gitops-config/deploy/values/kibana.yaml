@@ -1,0 +1,21 @@
+persistence:
+  enabled: true
+  storageClass: "standard"
+  size: 5Gi
+
+
+ingress:
+  enabled: true
+  pathType: Prefix
+  hostname: logging.tskmstr.mooo.com
+  path: /
+  ingressClassName: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+ 
+
+elasticsearch:
+  hosts:
+    - elasticsearch.logging.svc.cluster.local
+  port: 9200

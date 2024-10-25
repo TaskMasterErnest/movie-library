@@ -1,0 +1,39 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.appName }}-ingress
+  namespace: {{ default "default" .Values.namespace }}
+  {{- if .Values.tls.enabled }}
+  annotations:
+    {{- range .Values.ingress.tls }}
+    cert-manager.io/cluster-issuer: {{ .secretName | quote }}
+  {{- end }}    
+  {{- end }}
+spec:
+  {{- if .Values.tls.enabled }}
+  tls:
+    {{- range .Values.ingress.hosts }}
+    - hosts:
+      - {{ .host | quote }}
+    {{- end }}
+      {{- range .Values.ingress.tls }}
+      secretName: {{ .secretName }}
+      {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+            {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            {{- end }}
+    {{- end }}
+            backend:
+              service:
+                name: {{ .Chart.Name }}-svc
+                port:
+                  number: {{ .Values.proxy.service.targetPort }}
+{{- end }}

@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fluentd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+spec:
+  project: default
+  source:
+    chart: fluentd
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 5.15.1
+    helm:
+      releaseName: fluentd
+      valuesObject:
+        persistence:
+          enabled: true
+          storageClass: "standard"
+          size: 2Gi
+        aggregator:
+          enabled: true
+          configMap: elasticsearch-output
+          extraEnvVars:
+            - name: ELASTICSEARCH_HOST
+              value: "elasticsearch.logging.svc.cluster.local" 
+            - name: ELASTICSEARCH_PORT
+              value: "9200"
+        forwarder:
+          configMap: apache-log-parser
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: logging
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - ServerSideApply=true
+      - createNamespace=true

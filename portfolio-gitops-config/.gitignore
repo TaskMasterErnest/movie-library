@@ -1,0 +1,6 @@
+# stop secret from getting into Git
+docker-secret.yaml
+mongo-secret.yaml
+secret.yaml
+app-secret.yaml
+/app@tmp/*

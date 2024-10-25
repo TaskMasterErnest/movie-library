@@ -1,0 +1,34 @@
+
+namespaceOverride: "logging"
+
+
+master:
+  masterOnly: true
+  replicaCount: 1
+  persistence:
+    enabled: true
+    storageClass: "standard"
+  resources:
+    limits:
+      cpu: 750m
+    requests:
+      cpu: 250m
+
+
+data:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    storageClass: "standard"
+  resources:
+    limits: {}
+    requests:
+      cpu: 100m
+
+
+coordinating:
+  replicaCount: 1
+
+
+ingest:
+  replicaCount: 1

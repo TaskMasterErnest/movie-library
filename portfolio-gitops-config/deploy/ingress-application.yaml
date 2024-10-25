@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+spec:
+  project: default
+  source:
+    chart: ingress-nginx
+    repoURL: https://kubernetes.gitlab.io/ingress-nginx
+    targetRevision: 4.9.1
+    helm:
+      releaseName: ingress-nginx
+      valuesObject:
+        controller:
+          ingressClassResource:
+            enabled: true
+            default: true
+          metrics:
+            port: 10254
+            portName: metrics
+            enabled: true
+            service:
+              annotations:
+                prometheus.io/scrape: "true"
+                prometheus.io/port: "10254"
+            serviceMonitor:
+              enabled: true
+              additionalLabels: {}
+              annotations: {}
+              namespace: ""
+              namespaceSelector: {}
+              scrapeInterval: 15s
+              honorLabels: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - ServerSideApply=true
+      - createNamespace=true
